@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz App</title>
+<style>
+  :root { --bg:#0f1117; --card:#1a1d27; --border:#2a2d3e; --accent:#7c3aed; --text:#e2e8f0; --muted:#64748b; --green:#22c55e; --red:#ef4444; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:1rem; }
+  .container { width:100%; max-width:640px; }
+  h1 { text-align:center; font-size:2rem; background:linear-gradient(135deg,#7c3aed,#06b6d4); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:2rem; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:1rem; padding:2rem; }
+  .progress-bar { height:4px; background:var(--border); border-radius:2px; margin-bottom:1.5rem; overflow:hidden; }
+  .progress-fill { height:100%; background:var(--accent); transition:width .4s; }
+  .q-num { color:var(--muted); font-size:.85rem; margin-bottom:.5rem; }
+  .question { font-size:1.2rem; font-weight:600; margin-bottom:1.5rem; line-height:1.5; }
+  .options { display:flex; flex-direction:column; gap:.75rem; }
+  .opt { background:transparent; border:1px solid var(--border); color:var(--text); padding:.9rem 1.2rem; border-radius:.75rem; cursor:pointer; text-align:left; font-size:1rem; transition:all .15s; }
+  .opt:hover:not(:disabled) { border-color:var(--accent); background:rgba(124,58,237,.1); }
+  .opt.correct { border-color:var(--green); background:rgba(34,197,94,.15); color:var(--green); }
+  .opt.wrong { border-color:var(--red); background:rgba(239,68,68,.15); color:var(--red); }
+  .opt:disabled { cursor:default; }
+  .feedback { margin-top:1rem; padding:.75rem 1rem; border-radius:.5rem; font-size:.9rem; display:none; }
+  .feedback.show { display:block; }
+  .feedback.ok { background:rgba(34,197,94,.1); border:1px solid var(--green); color:var(--green); }
+  .feedback.fail { background:rgba(239,68,68,.1); border:1px solid var(--red); color:var(--red); }
+  .btn { width:100%; margin-top:1.5rem; padding:.9rem; background:var(--accent); color:#fff; border:none; border-radius:.75rem; font-size:1rem; font-weight:600; cursor:pointer; transition:opacity .15s; }
+  .btn:hover { opacity:.85; }
+  .result { text-align:center; }
+  .score-big { font-size:4rem; font-weight:700; background:linear-gradient(135deg,#7c3aed,#06b6d4); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .score-label { color:var(--muted); margin-bottom:1.5rem; }
+  .add-card { margin-top:1.5rem; }
+  .add-card h3 { margin-bottom:1rem; font-size:1rem; color:var(--muted); }
+  input, textarea { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:.5rem; padding:.75rem; font-size:.95rem; margin-bottom:.5rem; }
+  textarea { resize:vertical; min-height:60px; }
+  .opts-grid { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+  select { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:.5rem; padding:.75rem; font-size:.95rem; }
+  .add-btn { background:rgba(124,58,237,.2); border:1px solid var(--accent); color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧠 Quiz App</h1>
+  <div class="card" id="quiz-card">
+    <div class="progress-bar"><div class="progress-fill" id="prog"></div></div>
+    <div class="q-num" id="q-num"></div>
+    <div class="question" id="q-text"></div>
+    <div class="options" id="opts"></div>
+    <div class="feedback" id="fb"></div>
+    <button class="btn" id="next-btn" style="display:none" onclick="nextQ()">Sonraki →</button>
+  </div>
+
+  <div class="card result" id="result-card" style="display:none">
+    <div class="score-big" id="sc"></div>
+    <div class="score-label" id="sc-lbl"></div>
+    <button class="btn" onclick="restart()">Tekrar Oyna</button>
+  </div>
+
+  <div class="card add-card">
+    <h3>+ Yeni Soru Ekle</h3>
+    <textarea id="nq" placeholder="Soru metni"></textarea>
+    <div class="opts-grid">
+      <input id="o1" placeholder="A şıkkı"><input id="o2" placeholder="B şıkkı">
+      <input id="o3" placeholder="C şıkkı"><input id="o4" placeholder="D şıkkı">
+    </div>
+    <select id="correct">
+      <option value="0">Doğru cevap: A</option><option value="1">Doğru cevap: B</option>
+      <option value="2">Doğru cevap: C</option><option value="3">Doğru cevap: D</option>
+    </select>
+    <button class="btn add-btn" style="margin-top:.75rem" onclick="addQ()">Soruyu Kaydet</button>
+  </div>
+</div>
+<script>
+const DEFAULT = [
+  {q:"JavaScript'te 'typeof null' ne döner?",opts:["null","object","undefined","boolean"],ans:1},
+  {q:"Python'da liste kopyalamak için hangi yöntem kullanılır?",opts:["list.copy()","list.clone()","list.duplicate()","list.new()"],ans:0},
+  {q:"HTTP durum kodu 404 ne anlama gelir?",opts:["Sunucu Hatası","Yetkilendirme Gerekli","Bulunamadı","Başarılı"],ans:2},
+  {q:"Git'te son commit'i geri almak için hangi komut kullanılır?",opts:["git undo","git revert HEAD","git reset HEAD~1","git delete last"],ans:2},
+  {q:"CSS'de 'position: sticky' ne işe yarar?",opts:["Elemanı sabitler","Scroll'a göre hem relative hem fixed gibi davranır","Elemanı gizler","Z-index belirler"],ans:1},
+];
+
+let questions, cur, score, answered;
+
+function load(){
+  try { return JSON.parse(localStorage.getItem('quiz_q')) || DEFAULT; } catch{ return DEFAULT; }
+}
+function saveQ(){ localStorage.setItem('quiz_q', JSON.stringify(questions)); }
+
+function start(){
+  questions = load(); cur = 0; score = 0; answered = false;
+  document.getElementById('quiz-card').style.display='block';
+  document.getElementById('result-card').style.display='none';
+  render();
+}
+
+function render(){
+  const q = questions[cur];
+  document.getElementById('prog').style.width = ((cur/questions.length)*100)+'%';
+  document.getElementById('q-num').textContent = `Soru ${cur+1} / ${questions.length}`;
+  document.getElementById('q-text').textContent = q.q;
+  const fb = document.getElementById('fb');
+  fb.className='feedback'; fb.textContent='';
+  document.getElementById('next-btn').style.display='none';
+  answered = false;
+  const opts = document.getElementById('opts');
+  opts.innerHTML = '';
+  q.opts.forEach((o,i) => {
+    const b = document.createElement('button');
+    b.className='opt'; b.textContent=`${['A','B','C','D'][i]}. ${o}`;
+    b.onclick = () => pick(i);
+    opts.appendChild(b);
+  });
+}
+
+function pick(i){
+  if(answered) return;
+  answered = true;
+  const q = questions[cur];
+  const btns = document.querySelectorAll('.opt');
+  btns.forEach(b => b.disabled=true);
+  const fb = document.getElementById('fb');
+  if(i===q.ans){
+    btns[i].classList.add('correct');
+    fb.textContent='✓ Doğru!'; fb.className='feedback show ok'; score++;
+  } else {
+    btns[i].classList.add('wrong');
+    btns[q.ans].classList.add('correct');
+    fb.textContent=`✗ Yanlış. Doğru cevap: ${q.opts[q.ans]}`; fb.className='feedback show fail';
+  }
+  document.getElementById('next-btn').style.display = cur < questions.length-1 ? 'block' : 'none';
+  if(cur===questions.length-1) setTimeout(showResult, 800);
+}
+
+function nextQ(){ cur++; render(); }
+
+function showResult(){
+  document.getElementById('quiz-card').style.display='none';
+  document.getElementById('result-card').style.display='block';
+  const pct = Math.round(score/questions.length*100);
+  document.getElementById('sc').textContent=`${score}/${questions.length}`;
+  const msgs = [[80,'🏆 Mükemmel!'],[60,'👍 İyi İş!'],[0,'📚 Biraz Daha Çalış']];
+  const msg = msgs.find(([t])=>pct>=t)[1];
+  document.getElementById('sc-lbl').textContent=`${pct}% — ${msg}`;
+}
+
+function restart(){ start(); }
+
+function addQ(){
+  const q=document.getElementById('nq').value.trim();
+  const os=[document.getElementById('o1'),document.getElementById('o2'),document.getElementById('o3'),document.getElementById('o4')].map(e=>e.value.trim());
+  const ans=parseInt(document.getElementById('correct').value);
+  if(!q||os.some(o=>!o)){alert('Tüm alanları doldurun.');return;}
+  questions.push({q,opts:os,ans});
+  saveQ();
+  [document.getElementById('nq'),...document.querySelectorAll('.opts-grid input')].forEach(e=>e.value='');
+  alert(`✓ Soru eklendi! Toplam: ${questions.length}`);
+}
+
+start();
+</script>
+</body>
+</html>
